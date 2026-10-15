@@ -7,6 +7,7 @@ from inline_markdown import (
     split_nodes_delimiter,
     split_nodes_image,
     split_nodes_link,
+    text_to_textnodes,
 )
 from textnode import TextNode, TextType
 
@@ -424,6 +425,84 @@ class TestSplitImagesAndLinks(unittest.TestCase):
                 TextNode(" and [page](/page)!", TextType.TEXT),
             ],
         )
+
+class TestTextToTextNodes(unittest.TestCase):
+    def test_assignment_example(self) -> None:
+        text: str = (
+            "This is **text** with an *italic* word and a "
+            "`code block` and an "
+            "![obi wan image](https://i.imgur.com/fJRm4Vk.jpeg) "
+            "and a [link](https://boot.dev)"
+        )
+
+        expected: list[TextNode] = [
+            TextNode("This is ", TextType.TEXT),
+            TextNode("text", TextType.BOLD),
+            TextNode(" with an ", TextType.TEXT),
+            TextNode("italic", TextType.ITALIC),
+            TextNode(" word and a ", TextType.TEXT),
+            TextNode("code block", TextType.CODE),
+            TextNode(" and an ", TextType.TEXT),
+            TextNode(
+                "obi wan image",
+                TextType.IMAGE,
+                "https://i.imgur.com/fJRm4Vk.jpeg",
+            ),
+            TextNode(" and a ", TextType.TEXT),
+            TextNode("link", TextType.LINK, "https://boot.dev"),
+        ]
+
+        self.assertEqual(text_to_textnodes(text), expected)
+
+    def test_plain_text_preserves_whitespace(self) -> None:
+        self.assertEqual(
+            text_to_textnodes("  plain text  "),
+            [TextNode("  plain text  ", TextType.TEXT)],
+        )
+
+    def test_empty_text(self) -> None:
+        self.assertEqual(text_to_textnodes(""), [])
+
+    def test_bold_before_italic(self) -> None:
+        self.assertEqual(
+            text_to_textnodes("**bold** and *italic*"),
+            [
+                TextNode("bold", TextType.BOLD),
+                TextNode(" and ", TextType.TEXT),
+                TextNode("italic", TextType.ITALIC),
+            ],
+        )
+
+    def test_code_preserves_literal_markdown(self) -> None:
+        self.assertEqual(
+            text_to_textnodes(
+                "`**literal** *text* ![image](url) [link](url)`"
+            ),
+            [
+                TextNode(
+                    "**literal** *text* ![image](url) [link](url)",
+                    TextType.CODE,
+                )
+            ],
+        )
+
+    def test_adjacent_images_and_links(self) -> None:
+        self.assertEqual(
+            text_to_textnodes("![cat](cat.png)[page](/page)"),
+            [
+                TextNode("cat", TextType.IMAGE, "cat.png"),
+                TextNode("page", TextType.LINK, "/page"),
+            ],
+        )
+
+    def test_unmatched_delimiters_raise(self) -> None:
+        text: str
+        for text in ["unfinished `code", "**bold", "*italic"]:
+            with self.subTest(text=text):
+                with self.assertRaisesRegex(
+                    ValueError, "unmatched delimiter"
+                ):
+                    text_to_textnodes(text)
 
 
 if __name__ == "__main__":
