@@ -53,3 +53,84 @@ def extract_markdown_links(text: str) -> list[tuple[str, str]]:
         text,
     )
     return matches
+
+def split_nodes_image(old_nodes: list[TextNode]) -> list[TextNode]:
+    new_nodes: list[TextNode] = []
+
+    node: TextNode
+    for node in old_nodes:
+        if node.text_type != TextType.TEXT:
+            new_nodes.append(node)
+            continue
+
+        cursor: int = 0
+
+        match: re.Match[str]
+        for match in re.finditer(
+            r"!\[([^\[\]]*)\]\(([^\(\)]*)\)",
+            node.text,
+        ):
+            if match.start() > cursor:
+                new_nodes.append(
+                    TextNode(
+                        node.text[cursor:match.start()],
+                        TextType.TEXT,
+                    )
+                )
+
+            new_nodes.append(
+                TextNode(
+                    match.group(1),
+                    TextType.IMAGE,
+                    match.group(2),
+                )
+            )
+            cursor = match.end()
+
+        if cursor < len(node.text):
+            new_nodes.append(
+                TextNode(node.text[cursor:], TextType.TEXT)
+            )
+
+    return new_nodes
+
+
+def split_nodes_link(old_nodes: list[TextNode]) -> list[TextNode]:
+    new_nodes: list[TextNode] = []
+
+    node: TextNode
+    for node in old_nodes:
+        if node.text_type != TextType.TEXT:
+            new_nodes.append(node)
+            continue
+
+        cursor: int = 0
+
+        match: re.Match[str]
+        for match in re.finditer(
+            r"(?<!!)\[([^\[\]]*)\]\(([^\(\)]*)\)",
+            node.text,
+        ):
+            if match.start() > cursor:
+                new_nodes.append(
+                    TextNode(
+                        node.text[cursor:match.start()],
+                        TextType.TEXT,
+                    )
+                )
+
+            new_nodes.append(
+                TextNode(
+                    match.group(1),
+                    TextType.LINK,
+                    match.group(2),
+                )
+            )
+            cursor = match.end()
+
+        if cursor < len(node.text):
+            new_nodes.append(
+                TextNode(node.text[cursor:], TextType.TEXT)
+            )
+
+    return new_nodes

@@ -1,9 +1,12 @@
 import unittest
+from collections.abc import Callable
 
 from inline_markdown import (
     extract_markdown_images,
     extract_markdown_links,
     split_nodes_delimiter,
+    split_nodes_image,
+    split_nodes_link,
 )
 from textnode import TextNode, TextType
 
@@ -255,6 +258,171 @@ class TestExtractMarkdown(unittest.TestCase):
         self.assertEqual(
             extract_markdown_links("[page](/page)[page](/page)"),
             [("page", "/page"), ("page", "/page")],
+        )
+
+class TestSplitImagesAndLinks(unittest.TestCase):
+    def check_split_cases(
+        self,
+        splitter: Callable[[list[TextNode]], list[TextNode]],
+        prefix: str,
+        text_type: TextType,
+    ) -> None:
+        first: str = f"{prefix}[first](one)"
+        second: str = f"{prefix}[second](two)"
+
+        cases: list[tuple[str, list[TextNode]]] = [
+            ("plain text", [TextNode("plain text", TextType.TEXT)]),
+            ("", []),
+            (
+                first,
+                [TextNode("first", text_type, "one")],
+            ),
+            (
+                f"{first} after",
+                [
+                    TextNode("first", text_type, "one"),
+                    TextNode(" after", TextType.TEXT),
+                ],
+            ),
+            (
+                f"before {first}",
+                [
+                    TextNode("before ", TextType.TEXT),
+                    TextNode("first", text_type, "one"),
+                ],
+            ),
+            (
+                f"before {first} after",
+                [
+                    TextNode("before ", TextType.TEXT),
+                    TextNode("first", text_type, "one"),
+                    TextNode(" after", TextType.TEXT),
+                ],
+            ),
+            (
+                f"{first} and {second}",
+                [
+                    TextNode("first", text_type, "one"),
+                    TextNode(" and ", TextType.TEXT),
+                    TextNode("second", text_type, "two"),
+                ],
+            ),
+            (
+                f"{first}{second}",
+                [
+                    TextNode("first", text_type, "one"),
+                    TextNode("second", text_type, "two"),
+                ],
+            ),
+            (
+                f"{first}{first}",
+                [
+                    TextNode("first", text_type, "one"),
+                    TextNode("first", text_type, "one"),
+                ],
+            ),
+            (
+                f"{prefix}[](url)",
+                [TextNode("", text_type, "url")],
+            ),
+            (
+                f"{prefix}[unfinished](url",
+                [TextNode(f"{prefix}[unfinished](url", TextType.TEXT)],
+            ),
+        ]
+
+        text: str
+        expected: list[TextNode]
+        for text, expected in cases:
+            with self.subTest(text=text, text_type=text_type):
+                self.assertEqual(
+                    splitter([TextNode(text, TextType.TEXT)]),
+                    expected,
+                )
+
+        self.assertEqual(splitter([]), [])
+
+    def test_images(self) -> None:
+        self.check_split_cases(
+            split_nodes_image, "!", TextType.IMAGE
+        )
+
+    def test_links(self) -> None:
+        self.check_split_cases(
+            split_nodes_link, "", TextType.LINK
+        )
+
+    def test_non_text_nodes_are_preserved(self) -> None:
+        protected_nodes: list[TextNode] = [
+            TextNode("![cat](cat.png)", TextType.CODE),
+            TextNode("[page](/page)", TextType.BOLD),
+            TextNode("existing", TextType.LINK, "/existing"),
+        ]
+
+        splitter: Callable[[list[TextNode]], list[TextNode]]
+        for splitter in (split_nodes_image, split_nodes_link):
+            result: list[TextNode] = splitter(protected_nodes)
+
+            self.assertEqual(result, protected_nodes)
+            self.assertIsNot(result, protected_nodes)
+
+            index: int
+            for index in range(len(protected_nodes)):
+                self.assertIs(result[index], protected_nodes[index])
+
+    def test_link_splitter_skips_identical_image_syntax(self) -> None:
+        node: TextNode = TextNode(
+            "![same](url) then [same](url)",
+            TextType.TEXT,
+        )
+
+        self.assertEqual(
+            split_nodes_link([node]),
+            [
+                TextNode("![same](url) then ", TextType.TEXT),
+                TextNode("same", TextType.LINK, "url"),
+            ],
+        )
+
+    def test_image_splitter_leaves_links_as_text(self) -> None:
+        node: TextNode = TextNode(
+            "[page](/page) and ![cat](cat.png)",
+            TextType.TEXT,
+        )
+
+        self.assertEqual(
+            split_nodes_image([node]),
+            [
+                TextNode("[page](/page) and ", TextType.TEXT),
+                TextNode("cat", TextType.IMAGE, "cat.png"),
+            ],
+        )
+
+    def test_multiple_nodes_and_both_passes(self) -> None:
+        old_nodes: list[TextNode] = [
+            TextNode("See ![cat](cat.png)", TextType.TEXT),
+            TextNode(" and [page](/page)!", TextType.TEXT),
+        ]
+
+        result: list[TextNode] = split_nodes_image(old_nodes)
+        result = split_nodes_link(result)
+
+        self.assertEqual(
+            result,
+            [
+                TextNode("See ", TextType.TEXT),
+                TextNode("cat", TextType.IMAGE, "cat.png"),
+                TextNode(" and ", TextType.TEXT),
+                TextNode("page", TextType.LINK, "/page"),
+                TextNode("!", TextType.TEXT),
+            ],
+        )
+        self.assertEqual(
+            old_nodes,
+            [
+                TextNode("See ![cat](cat.png)", TextType.TEXT),
+                TextNode(" and [page](/page)!", TextType.TEXT),
+            ],
         )
 
 
