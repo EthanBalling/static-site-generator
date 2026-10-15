@@ -1,6 +1,10 @@
 import unittest
 
-from inline_markdown import split_nodes_delimiter
+from inline_markdown import (
+    extract_markdown_images,
+    extract_markdown_links,
+    split_nodes_delimiter,
+)
 from textnode import TextNode, TextType
 
 
@@ -154,6 +158,104 @@ class TestSplitNodesDelimiter(unittest.TestCase):
                 "",
                 TextType.BOLD,
             )
+
+
+class TestExtractMarkdown(unittest.TestCase):
+    def test_extract_single_image(self) -> None:
+        text: str = (
+            "This is text with an "
+            "![image](https://i.imgur.com/zjjcJKZ.png)"
+        )
+
+        self.assertEqual(
+            extract_markdown_images(text),
+            [("image", "https://i.imgur.com/zjjcJKZ.png")],
+        )
+
+    def test_extract_multiple_images(self) -> None:
+        text: str = (
+            "![rick roll](https://i.imgur.com/aKaOqIh.gif) and "
+            "![obi wan](https://i.imgur.com/fJRm4Vk.jpeg)"
+        )
+
+        self.assertEqual(
+            extract_markdown_images(text),
+            [
+                ("rick roll", "https://i.imgur.com/aKaOqIh.gif"),
+                ("obi wan", "https://i.imgur.com/fJRm4Vk.jpeg"),
+            ],
+        )
+
+    def test_extract_single_link(self) -> None:
+        self.assertEqual(
+            extract_markdown_links(
+                "Visit [Boot.dev](https://www.boot.dev)!"
+            ),
+            [("Boot.dev", "https://www.boot.dev")],
+        )
+
+    def test_extract_multiple_links(self) -> None:
+        text: str = (
+            "[to boot dev](https://www.boot.dev) and "
+            "[to youtube](https://www.youtube.com/@bootdotdev)"
+        )
+
+        self.assertEqual(
+            extract_markdown_links(text),
+            [
+                ("to boot dev", "https://www.boot.dev"),
+                ("to youtube", "https://www.youtube.com/@bootdotdev"),
+            ],
+        )
+
+    def test_images_and_links_stay_separate(self) -> None:
+        text: str = (
+            "![logo](logo.png)"
+            "[homepage](https://example.com)"
+            "![cat](cat.png)"
+        )
+
+        self.assertEqual(
+            extract_markdown_images(text),
+            [("logo", "logo.png"), ("cat", "cat.png")],
+        )
+        self.assertEqual(
+            extract_markdown_links(text),
+            [("homepage", "https://example.com")],
+        )
+
+    def test_image_is_not_a_link(self) -> None:
+        self.assertEqual(
+            extract_markdown_links("![image](image.png)"),
+            [],
+        )
+
+    def test_no_matches(self) -> None:
+        text: str
+        for text in ["", "plain text", "[unfinished](url"]:
+            with self.subTest(text=text):
+                self.assertEqual(extract_markdown_images(text), [])
+                self.assertEqual(extract_markdown_links(text), [])
+
+    def test_empty_labels(self) -> None:
+        self.assertEqual(
+            extract_markdown_images("![](image.png)"),
+            [("", "image.png")],
+        )
+        self.assertEqual(
+            extract_markdown_links("[](https://example.com)"),
+            [("", "https://example.com")],
+        )
+
+    def test_duplicate_matches_are_preserved(self) -> None:
+        self.assertEqual(
+            extract_markdown_images("![cat](cat.png)![cat](cat.png)"),
+            [("cat", "cat.png"), ("cat", "cat.png")],
+        )
+        self.assertEqual(
+            extract_markdown_links("[page](/page)[page](/page)"),
+            [("page", "/page"), ("page", "/page")],
+        )
 
 
 if __name__ == "__main__":
