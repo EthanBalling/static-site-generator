@@ -26,3 +26,22 @@ def generate_page(from_path: str, template_path: str, dest_path: str) -> None:
     destination: Path = Path(dest_path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(page, encoding="utf-8")
+
+
+def generate_pages_recursive(
+    dir_path_content: str,
+    template_path: str,
+    dest_dir_path: str,
+) -> None:
+    content_directory: Path = Path(dir_path_content)
+    destination_directory: Path = Path(dest_dir_path)
+
+    entry: Path
+    for entry in sorted(content_directory.iterdir()):
+        if entry.is_dir():
+            generate_pages_recursive(
+                str(entry), template_path, str(destination_directory / entry.name)
+            )
+        elif entry.is_file() and entry.suffix == ".md":
+            destination: Path = destination_directory / entry.with_suffix(".html").name
+            generate_page(str(entry), template_path, str(destination))

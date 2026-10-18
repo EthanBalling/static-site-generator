@@ -15,7 +15,7 @@
 import os
 import shutil
 
-from generate_page import generate_page
+from generate_page import generate_pages_recursive
 
 
 def copy_directory_contents(source: str, destination: str) -> None:
@@ -67,10 +67,10 @@ def main() -> None:
     destination: str = os.path.join(project_root, "public")
 
     copy_static(source, destination)
-    generate_page(
-        os.path.join(project_root, "content", "index.md"),
+    generate_pages_recursive(
+        os.path.join(project_root, "content"),
         os.path.join(project_root, "template.html"),
-        os.path.join(destination, "index.html"),
+        destination,
     )
 
 
