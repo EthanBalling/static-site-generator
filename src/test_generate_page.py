@@ -24,6 +24,37 @@ class TestExtractTitle(unittest.TestCase):
 
 
 class TestGeneratePage(unittest.TestCase):
+    def test_basepath_rewrites_root_links_and_images_but_preserves_other_urls(self) -> None:
+        temporary: str
+        with tempfile.TemporaryDirectory() as temporary:
+            root: Path = Path(temporary)
+            source: Path = root / "index.md"
+            template: Path = root / "template.html"
+            destination: Path = root / "index.html"
+            source.write_text(
+                "# Home\n\n[Contact](/contact) "
+                "[External](https://example.com/page) "
+                "[Section](#section) ![Image](/images/tolkien.png)",
+                encoding="utf-8",
+            )
+            template.write_text(
+                '<title>{{ Title }}</title><link href="/index.css">{{ Content }}',
+                encoding="utf-8",
+            )
+
+            basepath: str
+            for basepath in ("/", "/static-site-generator/"):
+                with self.subTest(basepath=basepath):
+                    generate_page(str(source), str(template), str(destination), basepath)
+                    html: str = destination.read_text(encoding="utf-8")
+                    self.assertIn(f'href="{basepath}index.css"', html)
+                    self.assertIn(f'href="{basepath}contact"', html)
+                    self.assertIn(f'src="{basepath}images/tolkien.png"', html)
+                    self.assertIn('href="https://example.com/page"', html)
+                    self.assertIn('href="#section"', html)
+                    self.assertNotIn("{{ Title }}", html)
+                    self.assertNotIn("{{ Content }}", html)
+
     def test_generates_utf8_html_and_creates_destination_directories(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root: Path = Path(temporary)
@@ -81,6 +112,32 @@ class TestGeneratePage(unittest.TestCase):
 
 
 class TestGeneratePagesRecursive(unittest.TestCase):
+    def test_propagates_basepath_to_root_and_deeply_nested_pages(self) -> None:
+        temporary: str
+        with tempfile.TemporaryDirectory() as temporary:
+            root: Path = Path(temporary)
+            content: Path = root / "content"
+            output: Path = root / "docs"
+            template: Path = root / "template.html"
+            template.write_text(
+                '<link href="/index.css">{{ Content }}', encoding="utf-8"
+            )
+            relative_path: str
+            for relative_path in ("index.md", "blog/nested/index.md"):
+                source: Path = content / relative_path
+                source.parent.mkdir(parents=True, exist_ok=True)
+                source.write_text("# Page\n\n[Home](/)", encoding="utf-8")
+
+            generate_pages_recursive(
+                str(content), str(template), str(output), "/static-site-generator/"
+            )
+
+            for relative_path in ("index.html", "blog/nested/index.html"):
+                with self.subTest(path=relative_path):
+                    html: str = (output / relative_path).read_text(encoding="utf-8")
+                    self.assertIn('href="/static-site-generator/index.css"', html)
+                    self.assertIn('href="/static-site-generator/"', html)
+
     def test_generates_nested_pages_and_preserves_relative_filenames(self) -> None:
         temporary: str
         with tempfile.TemporaryDirectory() as temporary:

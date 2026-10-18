@@ -14,6 +14,7 @@
 
 import os
 import shutil
+import sys
 
 from generate_page import generate_pages_recursive
 
@@ -60,17 +61,19 @@ def copy_static(source: str, destination: str) -> None:
 
 
 def main() -> None:
+    basepath: str = sys.argv[1] if len(sys.argv) > 1 else "/"
     project_root: str = os.path.dirname(
         os.path.dirname(os.path.abspath(__file__))
     )
     source: str = os.path.join(project_root, "static")
-    destination: str = os.path.join(project_root, "public")
+    destination: str = os.path.join(project_root, "docs")
 
     copy_static(source, destination)
     generate_pages_recursive(
         os.path.join(project_root, "content"),
         os.path.join(project_root, "template.html"),
         destination,
+        basepath,
     )
 
 
