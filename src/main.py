@@ -15,6 +15,8 @@
 import os
 import shutil
 
+from generate_page import generate_page
+
 
 def copy_directory_contents(source: str, destination: str) -> None:
     entries: list[str] = os.listdir(source)
@@ -65,6 +67,11 @@ def main() -> None:
     destination: str = os.path.join(project_root, "public")
 
     copy_static(source, destination)
+    generate_page(
+        os.path.join(project_root, "content", "index.md"),
+        os.path.join(project_root, "template.html"),
+        os.path.join(destination, "index.html"),
+    )
 
 
 if __name__ == "__main__":

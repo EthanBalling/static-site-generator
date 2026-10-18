@@ -1,7 +1,3 @@
-from shlex import quote
-
-from typing_extensions import Text
-
 from block_markdown import (
     BlockType,
     block_to_block_type,
@@ -85,7 +81,7 @@ def block_to_html_node(block: str) -> ParentNode:
 
     raise ValueError(f"Unsupported block type: {block_type!r}")
 
-def markdown_to_html_nodes(markdown: str) -> ParentNode:
+def markdown_to_html_node(markdown: str) -> ParentNode:
     blocks: list[str] = markdown_to_blocks(markdown)
     children: list[HTMLNode] = []
 
